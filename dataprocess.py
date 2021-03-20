@@ -45,6 +45,7 @@ class MPdataprocess:
                     self.begin_time = l_list[2]
 
     def load(self,filedir):
+        self.perprocess(filedir)
         # acce gyro magn pres ahrs wifi gnss
     #data   0    1    2    3    4   5     6
     #以上为数据对应关系data 为7*n的矩阵
@@ -53,6 +54,13 @@ class MPdataprocess:
                 l_list = re.split(r'[;\s]', line.strip())
                 #需要读入buffer的数据
                 if l_list[0]!='%' and l_list[2]>=self.begin_time:
+
+                    #将读入的数据都变成float 方便后续计算
+                    for i in range(1,len(l_list)):
+                        if l_list[0]=="WIFI" and i==6:
+                            pass
+                        else:
+                            l_list[i] = float(l_list[i])
                     #不同类型传感器存放位置不同 对齐不同
                     if l_list[0] == 'ACCE':
                         self.data[0].append(l_list)
@@ -122,4 +130,25 @@ class MPdataprocess:
 
     def wifi_process(self):
         with open("imu.txt", 'w') as file_write:
+            for i in range(len(self.data[5])):
+                line = str(self.data[5][i][2]-self.begin_time)+","+str(int(self.data[5][i][4].replace(":",""),16))\
+                       + str(self.data[5][i][6]) if self.wifi_equ_frequency else str(self.data[5][i][5])+'\n'
+            file_write.write(line)
     def gnss_process(self):
+        with open("gnss.txt",'w') as file_write:
+            begin_time = self.data[6][0][1]
+            for i in range(len(self.data[6])):
+                line = str(self.data[6][i][1]-begin_time)+','+str(self.data[6][i][2])\
+                +',' + str(self.data[6][i][3])+','+str(self.data[6][i][4])+','+str(self.data[6][i][5])\
+                +',' + str(self.data[6][i][6])+','+str(self.data[6][i][7])+','+str(self.data[6][i][9])\
+                +',' + str(self.data[6][i][10])
+            file_write.write(line)
+
+
+def main():
+    dataprocess = MPdataprocess
+    dataprocess.load("EVALUATION(1).txt")
+    dataprocess.imu_process()
+
+if __name__ == '__main__':
+    main()
