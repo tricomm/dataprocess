@@ -15,12 +15,19 @@ class MPdataprocess:
         with open(filedir) as file_object:
             for line in file_object:
                 '''逐行读取文件的每一行内容'''
+                if line == "":
+                    continue
                 l_list = re.split(r'[;\s]',line.strip())
-                if l_list[1] == 'WIFI' and l_list[2]=='data:':
+                if len(l_list) < 3:
+                    continue
+                if l_list[0]=='%' and l_list[1] == 'WIFI' and l_list[2]=='data:':
                     if l_list[8] =='Frequency':
                         self.wifi_equ_frequency = True
                     else:
                         self.wifi_equ_frequency = False
+
+                if l_list[0]=='%':
+                    continue
                 if l_list[0] =='ACCE':
                     if acce == None:
                         alread_feature+=1
@@ -42,7 +49,8 @@ class MPdataprocess:
                         alread_feature+=1
                     ahrs = l_list
                 if alread_feature == 5:
-                    self.begin_time = l_list[2]
+                    self.begin_time = float(l_list[2])
+                    return
 
     def load(self,filedir):
         self.perprocess(filedir)
@@ -53,14 +61,20 @@ class MPdataprocess:
             for line in file_object:
                 l_list = re.split(r'[;\s]', line.strip())
                 #需要读入buffer的数据
-                if l_list[0]!='%' and l_list[2]>=self.begin_time:
+                if l_list[0]=='%' or len(l_list)<3:
+                    continue
+                if l_list[0]!='%' and float(l_list[2])>=self.begin_time:
 
                     #将读入的数据都变成float 方便后续计算
                     for i in range(1,len(l_list)):
                         if l_list[0]=="WIFI" and i==6:
                             pass
                         else:
-                            l_list[i] = float(l_list[i])
+                            try:
+                                l_list[i] = float(l_list[i])
+                                break
+                            except:
+                                pass
                     #不同类型传感器存放位置不同 对齐不同
                     if l_list[0] == 'ACCE':
                         self.data[0].append(l_list)
@@ -84,18 +98,18 @@ class MPdataprocess:
         #对齐时间
         for i in range(len(self.data)):
             if i<5:
-                d = self.data[i][0][2]-self.begin_time
-                for i in self.data[i]:
-                    i[2]=i[2]-d;
-        self.end_time = min(self.data[0][-1],self.data[1][-1],self.data[2][-1],
-                            self.data[3][-1],self.data[4][-1])
+                d = float(self.data[i][0][2])-self.begin_time
+                for j in self.data[i]:
+                    j[2]=float(j[2])-d
+        self.end_time = min(self.data[0][-1][2],self.data[1][-1][2],self.data[2][-1][2],
+                            self.data[3][-1][2],self.data[4][-1][2])
 
         #插值 采样周期必须为5ms的公倍数   k到k+1中间插值
         inter_data =[[]for i in range(7)]
         for i in range(5):
             # 未插值的data指针
             k = 0
-            for j in range((self.end_time-self.begin_time)/0.005 +1):
+            for j in range(int((self.end_time-self.begin_time)/0.005) +1):
                 #直接写入
                 if self.data[i][k][2] == self.begin_time+j*0.005:
                     k=k+1
@@ -108,19 +122,19 @@ class MPdataprocess:
                     #对第l=3到n 个特征的线性插值
                     for l in range(3,len(self.data[i][k])):
                         inter_data[i][-1].append(self.liner_intert(self.begin_time+j*0.005,
-                                                                   self.data[i][k][2],
-                                                                   self.data[i][k][l],
-                                                                   self.data[i][k+1][2],
-                                                                   self.data[i][k+1][l]))
+                                                                   float(self.data[i][k][2]),
+                                                                   float(self.data[i][k][l]),
+                                                                   float(self.data[i][k+1][2]),
+                                                                   float(self.data[i][k+1][l])))
+        inter_data[5]=self.data[5]
         inter_data[6]=self.data[6]
-        inter_data[7]=self.data[7]
         self.data = inter_data
 
 
 
     def imu_process(self):
         with open("imu.txt",'w') as file_write:
-            for i in range((self.end_time-self.begin_time)/0.005 +1):
+            for i in range(int((self.end_time-self.begin_time)/0.005) +1):
                 line = str(self.begin_time+i*0.005)+","+str(self.data[0][i][3])+","+str(self.data[0][i][4])+","+str(self.data[0][i][5])\
                                                     +"," + str(self.data[1][i][3]) + "," + str(self.data[1][i][4]) + "," + str(self.data[1][i][5])\
                                                     +"," + str(self.data[2][i][3]) + "," + str(self.data[2][i][4]) + "," + str(self.data[2][i][5])\
@@ -129,11 +143,11 @@ class MPdataprocess:
                 file_write.write(line)
 
     def wifi_process(self):
-        with open("imu.txt", 'w') as file_write:
+        with open("wifi.txt", 'w') as file_write:
             for i in range(len(self.data[5])):
-                line = str(self.data[5][i][2]-self.begin_time)+","+str(int(self.data[5][i][4].replace(":",""),16))\
+                line = str(float(self.data[5][i][2])-self.begin_time)+","+str(int(self.data[5][i][4].replace(":",""),16))\
                        + str(self.data[5][i][6]) if self.wifi_equ_frequency else str(self.data[5][i][5])+'\n'
-            file_write.write(line)
+                file_write.write(line)
     def gnss_process(self):
         with open("gnss.txt",'w') as file_write:
             begin_time = self.data[6][0][1]
@@ -141,14 +155,16 @@ class MPdataprocess:
                 line = str(self.data[6][i][1]-begin_time)+','+str(self.data[6][i][2])\
                 +',' + str(self.data[6][i][3])+','+str(self.data[6][i][4])+','+str(self.data[6][i][5])\
                 +',' + str(self.data[6][i][6])+','+str(self.data[6][i][7])+','+str(self.data[6][i][9])\
-                +',' + str(self.data[6][i][10])
-            file_write.write(line)
+                +',' + str(self.data[6][i][10])+'\n'
+                file_write.write(line)
 
 
 def main():
-    dataprocess = MPdataprocess
+    dataprocess = MPdataprocess()
     dataprocess.load("EVALUATION(1).txt")
-    dataprocess.imu_process()
+    #dataprocess.imu_process()
+    dataprocess.wifi_process()
+    #dataprocess.gnss_process()
 
 if __name__ == '__main__':
     main()
