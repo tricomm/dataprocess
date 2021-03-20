@@ -145,8 +145,10 @@ class MPdataprocess:
     def wifi_process(self):
         with open("wifi.txt", 'w') as file_write:
             for i in range(len(self.data[5])):
-                line = str(float(self.data[5][i][2])-self.begin_time)+","+str(int(self.data[5][i][4].replace(":",""),16))\
-                       + str(self.data[5][i][6]) if self.wifi_equ_frequency else str(self.data[5][i][5])+'\n'
+                Ctime = str(float(self.data[5][i][2])-self.begin_time)
+                c2=str(int(self.data[5][i][4].replace(":",""),16))
+                c3=str(self.data[5][i][6]) if self.wifi_equ_frequency else str(self.data[5][i][5])
+                line = Ctime+','+c2+','+c3+'\n'
                 file_write.write(line)
     def gnss_process(self):
         with open("gnss.txt",'w') as file_write:
