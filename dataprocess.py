@@ -79,6 +79,47 @@ class MPdataprocess:
                 d = self.data[i][0][2]-self.begin_time
                 for i in self.data[i]:
                     i[2]=i[2]-d;
-        self.end_time =
-        #插值
-        #需要的数据
+        self.end_time = min(self.data[0][-1],self.data[1][-1],self.data[2][-1],
+                            self.data[3][-1],self.data[4][-1])
+
+        #插值 采样周期必须为5ms的公倍数   k到k+1中间插值
+        inter_data =[[]for i in range(7)]
+        for i in range(5):
+            # 未插值的data指针
+            k = 0
+            for j in range((self.end_time-self.begin_time)/0.005 +1):
+                #直接写入
+                if self.data[i][k][2] == self.begin_time+j*0.005:
+                    k=k+1
+                    inter_data[i].append(self.data[i][j])
+                else:
+                    inter_data[i].append([])
+                    inter_data[i][-1].append(self.data[i][k][0])
+                    inter_data[i][-1].append(self.data[i][k][1])
+                    inter_data[i][-1].append(self.begin_time+j*0.005)
+                    #对第l=3到n 个特征的线性插值
+                    for l in range(3,len(self.data[i][k])):
+                        inter_data[i][-1].append(self.liner_intert(self.begin_time+j*0.005,
+                                                                   self.data[i][k][2],
+                                                                   self.data[i][k][l],
+                                                                   self.data[i][k+1][2],
+                                                                   self.data[i][k+1][l]))
+        inter_data[6]=self.data[6]
+        inter_data[7]=self.data[7]
+        self.data = inter_data
+
+
+
+    def imu_process(self):
+        with open("imu.txt",'w') as file_write:
+            for i in range((self.end_time-self.begin_time)/0.005 +1):
+                line = str(self.begin_time+i*0.005)+","+str(self.data[0][i][3])+","+str(self.data[0][i][4])+","+str(self.data[0][i][5])\
+                                                    +"," + str(self.data[1][i][3]) + "," + str(self.data[1][i][4]) + "," + str(self.data[1][i][5])\
+                                                    +"," + str(self.data[2][i][3]) + "," + str(self.data[2][i][4]) + "," + str(self.data[2][i][5])\
+                                                    +","+str(self.data[4][i][3])+","+str(self.data[4][i][4])+","+str(self.data[4][i][5])\
+                                                    +","+str(self.data[3][i][3])+'\n'
+                file_write.write(line)
+
+    def wifi_process(self):
+        with open("imu.txt", 'w') as file_write:
+    def gnss_process(self):
